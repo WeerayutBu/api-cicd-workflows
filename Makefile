@@ -1,4 +1,4 @@
-.PHONY: install run test lint fmt docker-build docker-run docker-clean clean
+.PHONY: install run test lint fmt docker-build docker-run docker-clean clean lint-ci act
 
 install:
 	pip install -r requirements.txt
@@ -28,3 +28,9 @@ docker-clean:
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
+
+lint-ci:
+	actionlint .github/workflows/ci.yml
+
+act:
+	act -j test
