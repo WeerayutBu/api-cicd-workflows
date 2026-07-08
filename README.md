@@ -75,25 +75,42 @@ flowchart TD
 - **`build-and-push`** — only after `test` passes, only on push to `main`. Pushes to `ghcr.io/<owner>/<repo>`.
 
 ### Example: test the flow
+
+**Step 1 — Test locally, before pushing anything**
 ```bash
-# 0. Commit your changes on a feature branch (gh pr create requires a non-main branch)
+actionlint .github/workflows/ci.yml   # lint the workflow file
+act -j test                           # run the `test` job locally
+```
+
+**Step 2 — Push a branch and open a PR (triggers `test` only)**
+```bash
 git checkout -b my-branch
 git add -A
 git commit -m "My changes"
-
-# 1. Lint the workflow file itself
-actionlint .github/workflows/ci.yml
-
-# 2. Run the `test` job locally (no push needed)
-act -j test
-
-# 3. Push the branch / open a PR -> triggers `test` only
 git push -u origin my-branch
 gh pr create --fill
-
-# 4. Merge to main -> triggers `test` + `build-and-push`
-#    then check the Actions tab and Packages tab on GitHub
+gh pr checks   # test should pass, build-and-push should skip
 ```
+
+**Step 3 — Merge to `main` (triggers `test` + `build-and-push`)**
+
+`pr-number` identifies which PR to merge — optional if you're still on the branch that opened it, since `gh` infers it from there. To find it, run:
+```bash
+gh pr list
+```
+Example output (the number is under `ID`):
+```
+Showing 1 of 1 open pull request in WeerayutBu/api-cicd-workflows
+
+ID  TITLE       BRANCH     CREATED AT
+#1  My changes  my-branch  about 10 minutes ago
+```
+Then merge:
+```bash
+gh pr merge [pr-number] --merge
+```
+
+Either way, make sure everything is committed and pushed first (`git status` should say "nothing to commit"), then check the **Actions** tab (both jobs run) and **Packages** tab (new image published) on GitHub afterward.
 
 ## Setup github workflows
 Use official installers, not the Snap Store — `actionlint`/`act` snaps under those names are unrelated packages.
