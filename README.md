@@ -31,9 +31,9 @@ src/
 - Swagger UI: `/docs`
 
 ## Configuration
-Settings are loaded from environment variables (or a local `.env` file, via `pydantic-settings`). Copy `.env.example` to `.env` to customize:
-- `APP_NAME` — service name (default `api-cicd-workflows`)
-- `APP_VERSION` — service version (default `1.0.0`)
+Loaded from env vars or `.env` (via `pydantic-settings`). Copy `.env.example` to `.env`:
+- `APP_NAME` — default `api-cicd-workflows`
+- `APP_VERSION` — default `1.0.0`
 
 ## Run locally
 ```
@@ -53,21 +53,8 @@ docker build -t api-cicd-workflows .
 docker run -p 8000:8000 api-cicd-workflows
 ```
 
-## Push to GitHub
-This repo has no commits or remote yet. First, create an empty repo on GitHub (via the web UI or `gh repo create`), then:
-
-| Description | Command |
-|---|---|
-| Stage all files | `git add .` |
-| Commit | `git commit -m "Initial commit"` |
-| Rename branch to `main` (current branch is `master`; the CI workflow only triggers on `main`) | `git branch -M main` |
-| Link the GitHub repo as `origin` | `git remote add origin https://github.com/<user>/<repo>.git` |
-| Push and set upstream | `git push -u origin main` |
-
-After this first push, `git push` alone is enough for subsequent commits — and it'll trigger the `test` job automatically (see below).
-
 ## CI/CD workflow
-Defined in [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Two jobs, gated in sequence:
+Defined in [`.github/workflows/ci.yml`](.github/workflows/ci.yml):
 
 ```mermaid
 flowchart TD
@@ -84,20 +71,42 @@ flowchart TD
     D2 --> D3[Build and push to ghcr.io]
 ```
 
-- **`test`** runs on every push and PR targeting `main` — lint (ruff) then tests (pytest). A failure here stops the pipeline.
-- **`build-and-push`** only runs after `test` passes, and only for a push to `main` (not PRs) — so opening a PR gives you lint/test feedback without publishing an image. It logs into GHCR with the auto-generated `secrets.GITHUB_TOKEN`, tags the image with the commit SHA, branch name, and `latest`, then pushes to `ghcr.io/<owner>/<repo>`.
+- **`test`** — lint + pytest, on every push/PR to `main`.
+- **`build-and-push`** — only after `test` passes, only on push to `main`. Pushes to `ghcr.io/<owner>/<repo>`.
 
-See [Testing GitHub workflows](#testing-github-workflows) below to try it locally before pushing.
+### Example: test the flow
+```bash
+# 0. Commit your changes on a feature branch (gh pr create requires a non-main branch)
+git checkout -b my-branch
+git add -A
+git commit -m "My changes"
 
-## Testing GitHub workflows
-Avoid the Snap Store for `actionlint`/`act` — both snaps under those names are unrelated/mismatched packages, not the real tools. Use the official install scripts below.
+# 1. Lint the workflow file itself
+actionlint .github/workflows/ci.yml
+
+# 2. Run the `test` job locally (no push needed)
+act -j test
+
+# 3. Push the branch / open a PR -> triggers `test` only
+git push -u origin my-branch
+gh pr create --fill
+
+# 4. Merge to main -> triggers `test` + `build-and-push`
+#    then check the Actions tab and Packages tab on GitHub
+```
+
+## Setup github workflows
+Use official installers, not the Snap Store — `actionlint`/`act` snaps under those names are unrelated packages.
 
 | Description | Command |
 |---|---|
-| Install `actionlint` (official binary) | `bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) && sudo mv ./actionlint /usr/local/bin/` |
-| Lint the workflow file | `actionlint .github/workflows/ci.yml` |
-| Install `act` (official script) | `curl -s https://raw.githubusercontent.com/nektos/act/master/install.sh \| sudo bash` |
-| Run just the `test` job locally | `act -j test` |
-| Run the full pipeline locally (GHCR push step fails without a real token) | `act push` |
-| Verify the `test` job for real | Push a branch or open a PR, then check the **Actions** tab |
-| Verify the `build-and-push` job for real | Merge the PR into `main`, then check **Actions** and the **Packages** tab |
+| Install `actionlint` | `bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) && sudo mv ./actionlint /usr/local/bin/` |
+| Lint the workflow | `actionlint .github/workflows/ci.yml` |
+| Install `act` | `curl -s https://raw.githubusercontent.com/nektos/act/master/install.sh \| sudo bash` |
+| Run `test` job locally | `act -j test` |
+| Run full pipeline locally | `act push` (GHCR push needs a real token) |
+| Verify for real | Push/PR triggers `test`; merge to `main` triggers both — check **Actions** and **Packages** tabs |
+
+## Next steps
+- **Deploy the image** — GHCR only stores it; add a deploy step to actually run it somewhere public.
+- **Add branch protection on `main`** — require `test` to pass before merge.
