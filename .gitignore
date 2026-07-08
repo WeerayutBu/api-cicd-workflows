@@ -1,0 +1,11 @@
+.venv/
+.env
+data/
+models/
+*.pt
+*.bin
+*.safetensors
+*.gguf
+wandb/
+__pycache__/
+*.pyc
